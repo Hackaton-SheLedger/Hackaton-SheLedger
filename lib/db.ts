@@ -222,4 +222,5 @@ export async function getActivityCalendar(phone?: string) {
   }
 
   return calendar
+  
 }

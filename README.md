@@ -17,7 +17,8 @@
 
 ## 🔥 El Problema
 
-En Latinoamérica, **más de 30 millones de mujeres** lideran micro y pequeños negocios. Sin embargo:
+En Latinoamérica, **más de 30 millones de mujeres** lideran micro y pequeños negocios. 
+Sin embargo:
 
 | El dato | La realidad |
 |---------|------------|
