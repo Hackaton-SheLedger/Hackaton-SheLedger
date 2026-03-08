@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, DollarSign, Wallet, PiggyBank, CreditCard } from 'lucide-react'
+import { Plus, DollarSign, Wallet, PiggyBank, CreditCard, Sparkles, Volume2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -31,6 +31,9 @@ export function RecordForm({ onSubmit }: RecordFormProps) {
   const [paymentType, setPaymentType] = useState('cash')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [showCoachFeedback, setShowCoachFeedback] = useState(false)
+  const [isPlayingCoach, setIsPlayingCoach] = useState(false)
+  const [lastTransaction, setLastTransaction] = useState<{ sales: number; expenses: number; savings: number } | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -50,23 +53,31 @@ export function RecordForm({ onSubmit }: RecordFormProps) {
 
       if (!response.ok) throw new Error('Error al guardar')
 
+      const transaction = {
+        sales: parseFloat(sales) || 0,
+        expenses: parseFloat(expenses) || 0,
+        savings: parseFloat(savings) || 0
+      }
+
+      setLastTransaction(transaction)
+
       if (onSubmit) {
         onSubmit({
-          sales: parseFloat(sales) || 0,
-          expenses: parseFloat(expenses) || 0,
-          savings: parseFloat(savings) || 0,
+          ...transaction,
           paymentType,
         })
       }
 
       setSuccess(true)
+      setShowCoachFeedback(true)
+      
       setTimeout(() => {
         setSuccess(false)
         setSales('')
         setExpenses('')
         setSavings('')
         setPaymentType('cash')
-      }, 2000)
+      }, 3000)
     } catch (error) {
       console.error('Error:', error)
       alert('Error al guardar. Intenta de nuevo.')
@@ -183,6 +194,65 @@ export function RecordForm({ onSubmit }: RecordFormProps) {
               </>
             )}
           </Button>
+
+          {showCoachFeedback && lastTransaction && (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full gap-2 border-primary/30 bg-primary/5"
+              onClick={async () => {
+                if (isPlayingCoach) return
+                setIsPlayingCoach(true)
+                
+                try {
+                  const response = await fetch('/api/voice/coach', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ lastTransaction })
+                  })
+                  
+                  if (response.headers.get('Content-Type')?.includes('audio/mpeg')) {
+                    const audioBlob = await response.blob()
+                    const audioUrl = URL.createObjectURL(audioBlob)
+                    const audio = new Audio(audioUrl)
+                    audio.onended = () => {
+                      setIsPlayingCoach(false)
+                      setShowCoachFeedback(false)
+                      URL.revokeObjectURL(audioUrl)
+                    }
+                    audio.play()
+                  } else {
+                    const data = await response.json()
+                    if ('speechSynthesis' in window) {
+                      const utterance = new SpeechSynthesisUtterance(data.text)
+                      utterance.lang = 'es-ES'
+                      utterance.rate = 0.9
+                      utterance.onend = () => {
+                        setIsPlayingCoach(false)
+                        setShowCoachFeedback(false)
+                      }
+                      speechSynthesis.speak(utterance)
+                    }
+                  }
+                } catch {
+                  setIsPlayingCoach(false)
+                }
+              }}
+              disabled={isPlayingCoach}
+            >
+              {isPlayingCoach ? (
+                <>
+                  <Volume2 className="h-4 w-4 animate-pulse" />
+                  Escuchando consejo...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  Escuchar consejo de tu asesora
+                </>
+              )}
+            </Button>
+          )}
         </form>
       </CardContent>
     </Card>

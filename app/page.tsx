@@ -16,6 +16,7 @@ import { RecordForm } from '@/components/sheledger/record-form'
 import { Onboarding } from '@/components/sheledger/onboarding'
 import { WhatsAppConnect } from '@/components/sheledger/whatsapp-connect'
 import { DailySummaryPlayer, MotivationalAlert, VoiceAssistantBadge } from '@/components/sheledger/voice-features'
+import { FinancialCoach, CoachFeedback } from '@/components/sheledger/financial-coach'
 // ParsedFinancialData type from lib/mock-data.ts
 interface ParsedFinancialData {
   sales?: number
@@ -180,6 +181,7 @@ export default function SheLedgerDashboard() {
               <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
                 <div className="flex flex-col gap-6 lg:w-72 lg:shrink-0">
                   <ScoreWidget score={score} />
+                  <FinancialCoach />
                   <DailySummaryPlayer summary={summary} score={score} />
                   <MotivationalAlert summary={summary} score={score} />
                   <InsightsPanel insights={insights} />
