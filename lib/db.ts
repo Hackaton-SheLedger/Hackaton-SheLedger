@@ -1,6 +1,16 @@
-import { neon } from '@neondatabase/serverless'
+import { neon, type NeonQueryFunction } from '@neondatabase/serverless'
 
-const sql = neon(process.env.DATABASE_URL!)
+let _sql: NeonQueryFunction<false, false> | null = null
+
+function getSql() {
+  if (!_sql) {
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL environment variable is not set')
+    }
+    _sql = neon(process.env.DATABASE_URL)
+  }
+  return _sql
+}
 
 export interface DbRecord {
   id: number
@@ -13,10 +23,11 @@ export interface DbRecord {
 
 // Get or create user by phone
 export async function getOrCreateUser(phone: string) {
+  const sql = getSql()
   const existing = await sql`SELECT * FROM users WHERE phone = ${phone}`
   if (existing.length > 0) return existing[0]
-  
-  const result = await sql`
+
+  const result = await getSql()`
     INSERT INTO users (phone) VALUES (${phone})
     RETURNING *
   `
@@ -26,7 +37,7 @@ export async function getOrCreateUser(phone: string) {
 // Save a record
 export async function saveRecord(phone: string, sales: number, expenses: number, savings: number, source: string = 'whatsapp') {
   const user = await getOrCreateUser(phone)
-  const result = await sql`
+  const result = await getSql()`
     INSERT INTO records (user_id, phone, sales, expenses, savings, source)
     VALUES (${user.id}, ${phone}, ${sales}, ${expenses}, ${savings}, ${source})
     RETURNING *
@@ -37,7 +48,7 @@ export async function saveRecord(phone: string, sales: number, expenses: number,
 // Get all records (last 30 days)
 export async function getRecords(phone?: string) {
   if (phone) {
-    return await sql`
+    return await getSql()`
       SELECT r.* FROM records r
       JOIN users u ON r.user_id = u.id
       WHERE u.phone = ${phone}
@@ -45,7 +56,7 @@ export async function getRecords(phone?: string) {
       ORDER BY r.created_at DESC
     `
   }
-  return await sql`
+  return await getSql()`
     SELECT * FROM records
     WHERE created_at >= NOW() - INTERVAL '30 days'
     ORDER BY created_at DESC
@@ -54,8 +65,8 @@ export async function getRecords(phone?: string) {
 
 // Get weekly data for charts
 export async function getWeeklyData(phone?: string) {
-  const query = phone 
-    ? sql`
+  const query = phone
+    ? getSql()`
         SELECT 
           DATE(r.created_at) as date,
           SUM(r.sales) as sales,
@@ -68,7 +79,7 @@ export async function getWeeklyData(phone?: string) {
         GROUP BY DATE(r.created_at)
         ORDER BY date
       `
-    : sql`
+    : getSql()`
         SELECT 
           DATE(created_at) as date,
           SUM(sales) as sales,
@@ -85,7 +96,7 @@ export async function getWeeklyData(phone?: string) {
 // Get financial summary
 export async function getFinancialSummary(phone?: string) {
   const query = phone
-    ? sql`
+    ? getSql()`
         SELECT 
           COALESCE(SUM(r.sales), 0) as total_sales,
           COALESCE(SUM(r.expenses), 0) as total_expenses,
@@ -96,7 +107,7 @@ export async function getFinancialSummary(phone?: string) {
         WHERE u.phone = ${phone}
         AND r.created_at >= NOW() - INTERVAL '7 days'
       `
-    : sql`
+    : getSql()`
         SELECT 
           COALESCE(SUM(sales), 0) as total_sales,
           COALESCE(SUM(expenses), 0) as total_expenses,
@@ -107,14 +118,14 @@ export async function getFinancialSummary(phone?: string) {
       `
   const result = await query
   const data = result[0]
-  
+
   return {
     totalSales: Number(data.total_sales),
     totalExpenses: Number(data.total_expenses),
     totalSavings: Number(data.total_savings),
     netProfit: Number(data.total_sales) - Number(data.total_expenses),
     totalRecords: Number(data.total_records),
-    expenseRatio: data.total_sales > 0 
+    expenseRatio: data.total_sales > 0
       ? Math.round((Number(data.total_expenses) / Number(data.total_sales)) * 100)
       : 0
   }
@@ -125,21 +136,21 @@ export async function calculateScore(phone?: string) {
   const summary = await getFinancialSummary(phone)
   const streak = await getActivityStreak(phone)
   let score = 50
-  
+
   if (summary.totalRecords >= 5) score += 10
   if (summary.totalSavings > 0) score += 15
   if (summary.expenseRatio < 50) score += 15
   if (summary.netProfit > 0) score += 10
   if (streak >= 3) score += 5
   if (streak >= 7) score += 5
-  
+
   return Math.min(100, Math.max(0, score))
 }
 
 // Get activity streak (consecutive days with records)
 export async function getActivityStreak(phone?: string) {
   const query = phone
-    ? sql`
+    ? getSql()`
         SELECT DISTINCT DATE(r.created_at) as date
         FROM records r
         JOIN users u ON r.user_id = u.id
@@ -147,59 +158,59 @@ export async function getActivityStreak(phone?: string) {
         AND r.created_at >= NOW() - INTERVAL '30 days'
         ORDER BY date DESC
       `
-    : sql`
+    : getSql()`
         SELECT DISTINCT DATE(created_at) as date
         FROM records
         WHERE created_at >= NOW() - INTERVAL '30 days'
         ORDER BY date DESC
       `
-  
+
   const result = await query
   if (result.length === 0) return 0
-  
+
   let streak = 0
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  
+
   for (let i = 0; i < result.length; i++) {
     const recordDate = new Date(result[i].date)
     recordDate.setHours(0, 0, 0, 0)
-    
+
     const expectedDate = new Date(today)
     expectedDate.setDate(today.getDate() - i)
-    
+
     if (recordDate.getTime() === expectedDate.getTime()) {
       streak++
     } else {
       break
     }
   }
-  
+
   return streak
 }
 
 // Get activity calendar (last 30 days)
 export async function getActivityCalendar(phone?: string) {
   const query = phone
-    ? sql`
+    ? getSql()`
         SELECT DISTINCT DATE(r.created_at) as date
         FROM records r
         JOIN users u ON r.user_id = u.id
         WHERE u.phone = ${phone}
         AND r.created_at >= NOW() - INTERVAL '30 days'
       `
-    : sql`
+    : getSql()`
         SELECT DISTINCT DATE(created_at) as date
         FROM records
         WHERE created_at >= NOW() - INTERVAL '30 days'
       `
-  
+
   const result = await query
   const activeDates = new Set(result.map(r => new Date(r.date).toISOString().split('T')[0]))
-  
+
   const calendar = []
   const today = new Date()
-  
+
   for (let i = 29; i >= 0; i--) {
     const date = new Date(today)
     date.setDate(today.getDate() - i)
@@ -209,6 +220,6 @@ export async function getActivityCalendar(phone?: string) {
       hasActivity: activeDates.has(dateStr)
     })
   }
-  
+
   return calendar
 }
