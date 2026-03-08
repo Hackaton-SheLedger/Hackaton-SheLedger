@@ -1,20 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getRecords, getWeeklyData, getFinancialSummary, calculateScore, saveRecord } from '@/lib/db'
+import { getRecords, getWeeklyData, getFinancialSummary, calculateScore, saveRecord, getActivityStreak, getActivityCalendar } from '@/lib/db'
 
 export async function GET() {
   try {
-    const [records, weeklyData, summary, score] = await Promise.all([
+    const [records, weeklyData, summary, score, streak, calendar] = await Promise.all([
       getRecords(),
       getWeeklyData(),
       getFinancialSummary(),
-      calculateScore()
+      calculateScore(),
+      getActivityStreak(),
+      getActivityCalendar()
     ])
 
     return NextResponse.json({
       records,
       weeklyData,
       summary,
-      score
+      score,
+      streak,
+      calendar
     })
   } catch (error) {
     console.error('Error fetching records:', error)
