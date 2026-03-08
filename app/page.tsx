@@ -16,7 +16,12 @@ import { RecordForm } from '@/components/sheledger/record-form'
 import { Onboarding } from '@/components/sheledger/onboarding'
 import { WhatsAppConnect } from '@/components/sheledger/whatsapp-connect'
 import { DailySummaryPlayer, MotivationalAlert, VoiceAssistantBadge } from '@/components/sheledger/voice-features'
-import { type ParsedFinancialData } from '@/lib/mock-data'
+// ParsedFinancialData type from lib/mock-data.ts
+interface ParsedFinancialData {
+  sales?: number
+  expenses?: number
+  savings?: number
+}
 
 const fetcher = (url: string) => fetch(url).then(res => res.json())
 
@@ -77,17 +82,16 @@ export default function SheLedgerDashboard() {
     sales: Number(r.sales)
   })).reverse()
 
-  // Generate activity calendar
-  const activityCalendar = Array.from({ length: 30 }, (_, i) => {
-    const date = new Date()
-    date.setDate(date.getDate() - (29 - i))
-    const hasActivity = (data?.records || []).some((r: { created_at: string }) => 
-      new Date(r.created_at).toDateString() === date.toDateString()
-    )
-    return { date, hasActivity }
-  })
+  // Use activity calendar from API (real data from database)
+  const activityCalendar = (data?.calendar || []).map((c: { date: string; hasActivity: boolean }) => ({
+    date: new Date(c.date),
+    hasActivity: c.hasActivity
+  }))
 
-  // Generate insights
+  // Get streak from API
+  const streak = data?.streak || 0
+
+  // Generate insights from real data
   const insights: string[] = []
   if (summary.totalRecords > 0) {
     if (summary.expenseRatio < 50) {
@@ -101,6 +105,9 @@ export default function SheLedgerDashboard() {
     }
     if (summary.netProfit > 0) {
       insights.push(`Tu ganancia neta esta semana es S/ ${summary.netProfit}.`)
+    }
+    if (streak >= 3) {
+      insights.push(`Llevas ${streak} dias consecutivos registrando. Excelente constancia!`)
     }
   } else {
     insights.push('Comienza a registrar tus ventas para ver consejos personalizados.')

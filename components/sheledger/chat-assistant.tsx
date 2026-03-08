@@ -5,7 +5,13 @@ import { Send, Mic, MicOff, Volume2, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
-import { parseFinancialMessage, type ParsedFinancialData } from '@/lib/mock-data'
+import { parseFinancialMessage } from '@/lib/mock-data'
+
+interface ParsedFinancialData {
+  sales?: number
+  expenses?: number
+  savings?: number
+}
 
 interface Message {
   id: string
